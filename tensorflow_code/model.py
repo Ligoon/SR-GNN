@@ -74,6 +74,12 @@ class Model(object):
         return loss, logits
 
     # fetches = [model.opt, model.loss_train, model.global_step]
+# =============================================================================
+#     def run(self, fetches, tar, item, adj_in, adj_out, alias, mask):
+#         return self.sess.run(fetches, feed_dict={self.tar: tar, self.item: item, self.adj_in: adj_in,
+#                                                  self.adj_out: adj_out, self.alias: alias, self.mask: mask})
+# =============================================================================
+    
     def run(self, fetches, tar, item, adj_in, adj_out, alias, mask):
         return self.sess.run(fetches, feed_dict={self.tar: tar, self.item: item, self.adj_in: adj_in,
                                                  self.adj_out: adj_out, self.alias: alias, self.mask: mask})
@@ -103,7 +109,8 @@ class GGNN(Model):
                                      initializer=tf.random_uniform_initializer(-self.stdv, self.stdv))
         # variable_scope: allow tf.get_variable and tf.Variable to have the same name 
         with tf.variable_scope('ggnn_model', reuse=None):
-            self.loss_train, _ = self.forward(self.ggnn())
+            self.temp_re_embedding = self.ggnn()
+            self.loss_train, _ = self.forward(self.temp_re_embedding)
         with tf.variable_scope('ggnn_model', reuse=True):
             self.loss_test, self.score_test = self.forward(self.ggnn(), train=False)
         self.global_step = tf.Variable(0)
@@ -145,11 +152,6 @@ class GGNN(Model):
                 # After concat => shape = (batch_size, max_n_node, 2*hidden_size)
                 av = tf.concat([tf.matmul(self.adj_in, fin_state_in),
                                 tf.matmul(self.adj_out, fin_state_out)], axis=-1)
-                print("===================")
-                print(av)
-                print("===================")
-                print(tf.expand_dims(tf.reshape(av, [-1, 2*self.out_size]), axis=1))
-                print("===================")
                 # the input shape of dynamic_rnn = (batch_size * max_n_node, 1, 2 * hidden_size)
                 # the shape of fin_state return from dynamic_rnn = (batch_size x max_n_node, cell.output_size)
                 state_output, fin_state = \

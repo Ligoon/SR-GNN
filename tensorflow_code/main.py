@@ -29,18 +29,18 @@ parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of ste
 opt = parser.parse_args()
 train_data = pickle.load(open('../datasets/' + opt.dataset + '/train.pkl', 'rb'))
 test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.pkl', 'rb'))
-all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.pkl', 'rb'))
+# all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.pkl', 'rb'))
 # n_node: number of items, 37483 items in Yoochoose and 43097 items in Diginetica
 if opt.dataset == 'diginetica':
     n_node = 43098
 elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
     n_node = 37484
 elif opt.dataset == 'trivago':
-    n_node = 54608
+    n_node = 54902
 else:
     n_node = 310
 #%%
-g = build_graph(all_train_seq)
+# g = build_graph(all_train_seq)
 train_data = Data(train_data, sub_graph=True, method=opt.method, shuffle=True)
 test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)
 model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt.batchSize, n_node=n_node,
