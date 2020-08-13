@@ -60,7 +60,7 @@ print(opt)
 #%%
 best_result = [0, 0]
 best_epoch = [0, 0]
-for epoch in range(opt.epoch):
+for epoch in range(5):
     print('epoch: ', epoch, '===========================================')
     slices = train_data.generate_batch(model.batch_size) # list of numpy array
     fetches = [model.opt, model.loss_train, model.global_step]
@@ -78,15 +78,22 @@ for epoch in range(opt.epoch):
         adj_in, adj_out, alias, item, mask, targets, imps, alias_t = test_data.get_slice(i)
         scores, test_loss = model.run([model.score_test, model.loss_test], targets, item, adj_in, adj_out, alias, mask, imps, alias_t)
         test_loss_.append(test_loss)
-        index = np.argsort(scores, 1)[:, -20:]
-        for score, target in zip(index, targets):
-            hit.append(np.isin(target - 1, score))
-            if len(np.where(score == target - 1)[0]) == 0:
+        index = np.argsort(-(scores), 1)[:, :20]
+        tar_index = []
+        for i, j in zip(targets, imps):
+            if len(np.where(j==i)[0]) == 0:
+                tar_index.append(0)
+            else:
+                tar_index.append(np.where(j==i)[0][0])
+        tar_index = np.array(tar_index)
+        for score, target in zip(index, tar_index):
+            hit.append(np.isin(target, score))
+            if len(np.where(score == target)[0]) == 0:
                 mrr.append(0)
             else:
-                mrr.append(1 / (20-np.where(score == target - 1)[0][0]))
-    hit = np.mean(hit)*100
-    mrr = np.mean(mrr)*100
+                mrr.append(1 / (np.where(score == target)[0][0]+1))
+    hit = np.mean(hit)
+    mrr = np.mean(mrr)
     test_loss = np.mean(test_loss_)
     if hit >= best_result[0]:
         best_result[0] = hit

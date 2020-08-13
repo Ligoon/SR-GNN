@@ -175,13 +175,13 @@ class GGNN_Concat_EMB(GGNN, Impression_Embedding):
         self.learning_rate = tf.train.exponential_decay(lr, global_step=self.global_step, decay_steps=decay,
                                                         decay_rate=lr_dc, staircase=True)
         self.opt = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss_train, global_step=self.global_step)
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-        config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 0.8
-        session = tf.Session(config=config )
-        #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
-        #config = tf.ConfigProto(gpu_options=gpu_options)
-        #config.gpu_options.allow_growth = True
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        #config = tf.ConfigProto()
+        #config.gpu_options.per_process_gpu_memory_fraction = 0.8
+        #session = tf.Session(config=config )
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+        config = tf.ConfigProto(gpu_options=gpu_options)
+        config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer()) # initial all variables
     
