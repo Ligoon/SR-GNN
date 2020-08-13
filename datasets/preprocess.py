@@ -25,9 +25,10 @@ elif opt.dataset =='yoochoose':
     dataset = './yoochoose-data/yoochoose-for-GNN.csv'
     # dataset = './yoochoose-data/yoochoose-clicks.dat'
 elif opt.dataset == 'trivago':
-    dataset = './trivago-data/trivago_clickdata.csv'
+    dataset = './trivago/trivago_clickdata.csv'
 
 print("-- Starting @ %ss" % datetime.datetime.now())
+# reader : read row by row
 with open(dataset, "r") as f:
     if opt.dataset == 'yoochoose':
         reader = csv.DictReader(f, delimiter=',')
@@ -35,13 +36,22 @@ with open(dataset, "r") as f:
         reader = csv.DictReader(f, delimiter=',')
     else:
         reader = csv.DictReader(f, delimiter=';')
+    # sess_clicks : store session sequence with the key of session_id
+    # for example : sess_clicks['729803'] = ['109038', '1257342']
     sess_clicks = {}
+    # sess_date : store the last clicked item's timestamp of each session
+    # for example : sess_date['729803'] = 1541038485.0
     sess_date = {}
-    ctr = 0
-    curid = -1
+    ctr = 0 # Unused
+    curid = -1 # current id
     curdate = None
+    # data : a row in the csv file
+    # In this for loop, we convert the sessions in csv file to sess_clicks 
+    # format and also record the last click time in each session in sess_date
     for data in reader:
         sessid = data['session_id']
+        # if a session end (change to a new session), then store 
+        # the timestamp of the last clicked item. 
         if curdate and not curid == sessid:
             date = ''
             if opt.dataset == 'yoochoose':
@@ -70,7 +80,8 @@ with open(dataset, "r") as f:
             sess_clicks[sessid] += [item]
         else:
             sess_clicks[sessid] = [item]
-        ctr += 1
+        ctr += 1 # Unused(?)
+
     date = ''
     if opt.dataset == 'yoochoose':
         date = time.mktime(time.strptime(curdate[:19], '%Y-%m-%dT%H:%M:%S'))
@@ -99,10 +110,15 @@ for s in sess_clicks:
             iid_counts[iid] += 1
         else:
             iid_counts[iid] = 1
-
+# sort by the second lelment in every items in iid_count
+# that is sort by number of times each item appears.
+# for example result : ('898723', 1), ('174263', 1), ('314623', 2)
 sorted_counts = sorted(iid_counts.items(), key=operator.itemgetter(1))
 
 length = len(sess_clicks)
+# for each session, check # of time of each item, if it appears
+# less than 5, then delete that item in the session, after that,
+# check the session's lenght, if less then 2, delete the session.
 for s in list(sess_clicks):
     curseq = sess_clicks[s]
     filseq = list(filter(lambda i: iid_counts[i] >= 5, curseq))
@@ -127,6 +143,9 @@ if opt.dataset == 'yoochoose' or opt.dataset == 'trivago':
 else:
     splitdate = maxdate - 86400 * 7
 
+# split session_id by splitdate, 
+# tra_sess : list of (session_id, timestamp) before splitdate
+# tes_sess : list of (session_id, timestamp) after splitdate
 print('Splitting date', splitdate)      # Yoochoose: ('Split date', 1411930799.0)
 tra_sess = filter(lambda x: x[1] < splitdate, dates)
 tes_sess = filter(lambda x: x[1] > splitdate, dates)
@@ -134,24 +153,26 @@ tes_sess = filter(lambda x: x[1] > splitdate, dates)
 # Sort sessions by date
 tra_sess = sorted(tra_sess, key=operator.itemgetter(1))     # [(session_id, timestamp), (), ]
 tes_sess = sorted(tes_sess, key=operator.itemgetter(1))     # [(session_id, timestamp), (), ]
-print(len(tra_sess))    # 186670    # 7966257
-print(len(tes_sess))    # 15979     # 15324
+print(len(tra_sess))    # 186670    # 7966257   # trivago: 185970
+print(len(tes_sess))    # 15979     # 15324     # trivago: 39634
 print(tra_sess[:3])
 print(tes_sess[:3])
 print("-- Splitting train set and test set @ %ss" % datetime.datetime.now())
 
 # Choosing item count >=5 gives approximately the same number of items as reported in paper
+# item_dict : store {'item_id': new item number, 'item_id': new item number}
+# BTW, item_dict only store the items that appear in training data
 item_dict = {}
 # Convert training sessions to sequences and renumber items to start from 1
 def obtian_tra():
-    train_ids = []
-    train_seqs = []
+    train_ids = []  # store session id
+    train_seqs = [] # store item id which start from 1
     train_dates = []
     item_ctr = 1
     for s, date in tra_sess:
         seq = sess_clicks[s]
         outseq = []
-        for i in seq:
+        for i in seq:   # i : item_id
             if i in item_dict:
                 outseq += [item_dict[i]]
             else:
@@ -163,11 +184,12 @@ def obtian_tra():
         train_ids += [s]
         train_dates += [date]
         train_seqs += [outseq]
-    print(item_ctr)     # 43098, 37484
+    print(item_ctr)     # 43098, 37484  #trivago: 54608 
     return train_ids, train_dates, train_seqs
 
 
 # Convert test sessions to sequences, ignoring items that do not appear in training set
+# For trivago data : session # : 39634 -> 39187
 def obtian_tes():
     test_ids = []
     test_seqs = []
@@ -189,7 +211,10 @@ def obtian_tes():
 tra_ids, tra_dates, tra_seqs = obtian_tra()
 tes_ids, tes_dates, tes_seqs = obtian_tes()
 
-
+# ids : session's number, from 0 to len() - 1
+# convert session sequence to new format which consider the timestamp for model
+# input, and separate target. For example : if a session A = [3, 5, 7 ,4], then
+# out_seqs will be [[3, 5, 7], [3, 5], [3]], labs will be [4, 7, 5]
 def process_seqs(iseqs, idates):
     out_seqs = []
     out_dates = []
@@ -197,7 +222,7 @@ def process_seqs(iseqs, idates):
     ids = []
     for id, seq, date in zip(range(len(iseqs)), iseqs, idates):
         for i in range(1, len(seq)):
-            tar = seq[-i]
+            tar = seq[-i] # target
             labs += [tar]
             out_seqs += [seq[:-i]]
             out_dates += [date]
@@ -209,17 +234,18 @@ tr_seqs, tr_dates, tr_labs, tr_ids = process_seqs(tra_seqs, tra_dates)
 te_seqs, te_dates, te_labs, te_ids = process_seqs(tes_seqs, tes_dates)
 tra = (tr_seqs, tr_labs)
 tes = (te_seqs, te_labs)
-print(len(tr_seqs))
-print(len(te_seqs))
+print(len(tr_seqs))     # trivago: 414670
+print(len(te_seqs))     # trivago: 86056
 print(tr_seqs[:3], tr_dates[:3], tr_labs[:3])
 print(te_seqs[:3], te_dates[:3], te_labs[:3])
-all = 0
 
+all = 0
 for seq in tra_seqs:
     all += len(seq)
 for seq in tes_seqs:
     all += len(seq)
-print('avg length: ', all/(len(tra_seqs) + len(tes_seqs) * 1.0))
+print('avg length: ', all/(len(tra_seqs) + len(tes_seqs) * 1.0)) # trivago: 3.223
+
 if opt.dataset == 'diginetica':
     if not os.path.exists('diginetica'):
         os.makedirs('diginetica')
@@ -248,11 +274,11 @@ elif opt.dataset == 'yoochoose':
     pickle.dump(seq64, open('yoochoose1_64/all_train_seq.pkl', 'wb'))
     
 elif opt.dataset == 'trivago':
-    if not os.path.exists('trivago-data'):
-        os.makedirs('trivago-data')
-    pickle.dump(tra, open('trivago-data/train.pkl', 'wb'))
-    pickle.dump(tes, open('trivago-data/test.pkl', 'wb'))
-    pickle.dump(tra_seqs, open('trivago-data/all_train_seq.pkl', 'wb'))
+    if not os.path.exists('trivago'):
+        os.makedirs('trivago')
+    pickle.dump(tra, open('trivago/train.pkl', 'wb'))
+    pickle.dump(tes, open('trivago/test.pkl', 'wb'))
+    pickle.dump(tra_seqs, open('trivago/all_train_seq.pkl', 'wb'))
 else:
     if not os.path.exists('sample'):
         os.makedirs('sample')

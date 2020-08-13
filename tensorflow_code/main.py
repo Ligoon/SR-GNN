@@ -14,7 +14,7 @@ import argparse
 import datetime
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
+parser.add_argument('--dataset', default='trivago', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
 parser.add_argument('--method', type=str, default='ggnn', help='ggnn/gat/gcn')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--epoch', type=int, default=30, help='number of epochs to train for')
@@ -29,18 +29,18 @@ parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of ste
 opt = parser.parse_args()
 train_data = pickle.load(open('../datasets/' + opt.dataset + '/train.pkl', 'rb'))
 test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.pkl', 'rb'))
-all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.pkl', 'rb'))
+# all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.pkl', 'rb'))
 # n_node: number of items, 37483 items in Yoochoose and 43097 items in Diginetica
 if opt.dataset == 'diginetica':
     n_node = 43098
 elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
     n_node = 37484
 elif opt.dataset == 'trivago':
-    n_node = 203831
+    n_node = 54902
 else:
     n_node = 310
 #%%
-g = build_graph(all_train_seq)
+# g = build_graph(all_train_seq)
 train_data = Data(train_data, sub_graph=True, method=opt.method, shuffle=True)
 test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)
 model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt.batchSize, n_node=n_node,
@@ -52,7 +52,7 @@ best_result = [0, 0]
 best_epoch = [0, 0]
 for epoch in range(opt.epoch):
     print('epoch: ', epoch, '===========================================')
-    slices = train_data.generate_batch(model.batch_size)
+    slices = train_data.generate_batch(model.batch_size) # list of numpy array
     fetches = [model.opt, model.loss_train, model.global_step]
     print('start training: ', datetime.datetime.now())
     loss_ = []
@@ -84,5 +84,5 @@ for epoch in range(opt.epoch):
     if mrr >= best_result[1]:
         best_result[1] = mrr
         best_epoch[1]=epoch
-    print('train_loss:\t%.4f\ttest_loss:\t%4f\tRecall@20:\t%.4f\tMRR@20:\t%.4f\tEpoch:\t%d,\t%d'%
+    print('train_loss:  %.4f  test_loss:  %4f  Recall@20:  %.4f  MRR@20:  %.4f  Epoch:  %d,  %d'%
           (loss, test_loss, best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
